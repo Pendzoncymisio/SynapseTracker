@@ -1,0 +1,36 @@
+tracker:
+  host: "0.0.0.0"
+  http_port: 6881
+  udp_port: 6969
+  
+vector_search:
+  index_type: "flat"  # flat, ivf, hnsw
+  dimension: 768  # Nomic Embed dimension
+  similarity_metric: "cosine"
+  min_similarity: 0.3
+  
+embedding:
+  model: "nomic-ai/nomic-embed-text-v1.5"
+  use_onnx: true
+  cache_dir: "./.cache"
+  
+database:
+  path: "./tracker.db"
+  cleanup_interval: 3600  # 1 hour
+  peer_timeout: 7200  # 2 hours
+  
+server:
+  max_peers_returned: 50
+  announce_interval: 1800  # 30 minutes
+  min_announce_interval: 900  # 15 minutes
+  
+limits:
+  max_search_results: 100
+  max_request_size: "10MB"
+  rate_limit_per_ip: 100  # requests per minute
+  
+logging:
+  level: "INFO"
+  file: "./tracker.log"
+  max_size: "100MB"
+  backup_count: 5
