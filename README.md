@@ -27,14 +27,17 @@ uv sync
 
 ## Architecture
 
+**Lightweight Design**: No ML models or embeddings generation - clients handle that!
+
 ```
 ┌─────────────────────────────────────────────┐
 │          Synapse Tracker                    │
+│       (No ML Dependencies)                  │
 ├─────────────────────────────────────────────┤
 │                                             │
 │  ┌──────────────┐    ┌─────────────────┐  │
 │  │  BitTorrent  │    │  Vector Search  │  │
-│  │   Protocol   │    │     Engine      │  │
+│  │   Protocol   │    │  (FAISS Index)  │  │
 │  └──────────────┘    └─────────────────┘  │
 │         │                     │            │
 │         ├─────────────────────┤            │
@@ -45,6 +48,8 @@ uv sync
 │  └──────────────────────────────────────┘ │
 │                                             │
 └─────────────────────────────────────────────┘
+
+Clients generate embeddings → send vectors to tracker → get results
 ```
 
 ## Components
@@ -56,8 +61,8 @@ uv sync
 
 ### 2. Vector Search Engine (`vector_search.py`)
 - FAISS index for fast similarity search
-- Embedding storage and retrieval
-- Query processing
+- Pre-computed embedding storage and retrieval
+- Vector similarity queries (no text processing or ML models)
 
 ### 3. Metadata Store (`metadata_store.py`)
 - SQLite database for shard metadata
@@ -163,16 +168,21 @@ POST /api/register
 }
 ```
 
-**Vector Search:**
+**Vector Search (DEPRECATED - use /api/search/embedding):**
 ```
 POST /api/search
+
+⚠️  This endpoint is deprecated and returns HTTP 410 Gone.
+    Clients must generate embeddings and use /api/search/embedding instead.
+    See Synapse client for transparent embedding generation.
+```
+
+**Query by Embedding (PRIMARY SEARCH METHOD):**
+```
+POST /api/search/embedding
 {
-  "query": "Kubernetes deployment tutorial",
-  "limit": 10,
-  "filters": {
-    "model": "nomic-embed-text-v1.5",
-    "tags": ["devops"]
-  }
+  "embedding": [0.1, 0.2, ...],  // 768-dim vector (Nomic Embed)
+  "limit": 10
 }
 
 Response:
@@ -188,15 +198,9 @@ Response:
     }
   ]
 }
-```
 
-**Query by Embedding:**
-```
-POST /api/search/embedding
-{
-  "embedding": [0.1, 0.2, ...],  // 768-dim vector
-  "limit": 10
-}
+Note: Clients (like Synapse) generate embeddings from text queries,
+      then send the vector to this endpoint for similarity search.
 ```
 
 **Get Statistics:**
@@ -228,9 +232,15 @@ response = requests.post("http://tracker.example.com:6881/api/register", json={
     "tags": ["react", "javascript", "hooks"],
 })
 
-# Search for similar shards
-response = requests.post("http://tracker.example.com:6881/api/search", json={
-    "query": "How to use React hooks",
+# Search for similar shards (using pre-computed embedding)
+# In practice, use the Synapse client which handles embeddings automatically
+from embeddings import create_embedder  # From Synapse client
+
+embedder = create_embedder(use_onnx=True)
+query_embedding = embedder.encode("How to use React hooks").tolist()
+
+response = requests.post("http://tracker.example.com:6881/api/search/embedding", json={
+    "embedding": query_embedding,
     "limit": 5,
 })
 

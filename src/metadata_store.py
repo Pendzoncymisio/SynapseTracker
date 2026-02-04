@@ -628,4 +628,136 @@ class MetadataStore:
             ).fetchone()["avg"] or 0.0
             
             return stats
+    
+    # ========================================================================
+    # TrustRank Support Methods (Added 2026-02-04)
+    # ========================================================================
+    
+    def get_seeders(self, info_hash: str) -> List[Dict]:
+        """
+        Get all current seeders for a shard.
+        
+        Args:
+            info_hash: Shard hash
+        
+        Returns:
+            List of seeder info with agent_id, last_announce, etc.
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT 
+                    p.peer_id,
+                    p.ip,
+                    p.port,
+                    p.last_announce,
+                    p.uploaded,
+                    p.downloaded,
+                    a.agent_id,
+                    a.public_key
+                FROM peers p
+                LEFT JOIN agents a ON p.peer_id = a.agent_id
+                WHERE p.info_hash = ?
+                AND p.is_seeder = 1
+                AND datetime(p.last_announce) > datetime('now', '-2 hours')
+            """, (info_hash,)).fetchall()
+            
+            return [dict(row) for row in rows]
+    
+    def get_all_shard_hashes(self) -> List[str]:
+        """Get all shard hashes in database."""
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT info_hash FROM shards").fetchall()
+            return [row["info_hash"] for row in rows]
+    
+    def get_agent_reputation(self, agent_id: str) -> float:
+        """
+        Get normalized reputation score for an agent.
+        
+        Returns:
+            Float 0.0-1.0 representing reputation (0.5 = neutral)
+        """
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT trust_score FROM reputation WHERE agent_id = ?
+            """, (agent_id,)).fetchone()
+            
+            if row and row["trust_score"] is not None:
+                return float(row["trust_score"])
+            
+            # Default neutral reputation for new agents
+            return 0.5
+    
+    def get_trusting_agents(self, agent_id: str, min_rating: float = 0.7) -> List[str]:
+        """
+        Get agents who have positively attested to this agent's shards.
+        
+        Args:
+            agent_id: Target agent
+            min_rating: Minimum rating to count as "trusting" (default 0.7)
+        
+        Returns:
+            List of agent IDs who trust this agent
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute("""
+                SELECT DISTINCT consumer_agent_id
+                FROM attestations
+                WHERE provider_agent_id = ?
+                AND rating >= ?
+            """, (agent_id, min_rating)).fetchall()
+            
+            return [row["consumer_agent_id"] for row in rows]
+    
+    def get_shard_stats(self, info_hash: str) -> Dict:
+        """
+        Get statistics for a shard.
+        
+        Returns:
+            Dict with completed, seeders, leechers, etc.
+        """
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT 
+                    seeders,
+                    leechers,
+                    completed,
+                    created_at,
+                    last_seen
+                FROM shards
+                WHERE info_hash = ?
+            """, (info_hash,)).fetchone()
+            
+            if row:
+                return dict(row)
+            
+            return {
+                "seeders": 0,
+                "leechers": 0,
+                "completed": 0,
+                "created_at": None,
+                "last_seen": None,
+            }
+    
+    def has_attestation(self, agent_a: str, agent_b: str) -> bool:
+        """
+        Check if agent A has attested to agent B (or vice versa).
+        
+        Used for trust graph diversity calculation.
+        
+        Args:
+            agent_a: First agent ID
+            agent_b: Second agent ID
+        
+        Returns:
+            True if there's any attestation between them
+        """
+        with self._get_connection() as conn:
+            count = conn.execute("""
+                SELECT COUNT(*) as count
+                FROM attestations
+                WHERE (provider_agent_id = ? AND consumer_agent_id = ?)
+                   OR (provider_agent_id = ? AND consumer_agent_id = ?)
+            """, (agent_a, agent_b, agent_b, agent_a)).fetchone()["count"]
+            
+            return count > 0
 

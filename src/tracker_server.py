@@ -14,9 +14,6 @@ from urllib.parse import unquote
 from metadata_store import MetadataStore
 from vector_search import VectorSearchEngine
 
-# Will be injected when embedder is needed
-embedder = None
-
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -193,89 +190,22 @@ def register_shard():
 @app.route('/api/search', methods=['POST'])
 def search_shards():
     """
-    Search for memory shards by semantic similarity.
+    DEPRECATED: Text-based search removed. Use /api/search/embedding instead.
     
-    Body:
-        {
-            "query": "How to deploy Kubernetes",
-            "limit": 10,
-            "filters": {
-                "model": "nomic-embed-text-v1.5",
-                "tags": ["kubernetes", "devops"]
+    Clients should embed queries locally and send vectors.
+    This keeps the tracker lightweight and avoids model dependencies.
+    """
+    return jsonify({
+        "error": "Text search deprecated. Use /api/search/embedding",
+        "message": "Please embed your query locally and POST to /api/search/embedding with the vector",
+        "example": {
+            "url": "/api/search/embedding",
+            "body": {
+                "embedding": [0.1, 0.2, "... 768 dimensions"],
+                "limit": 10
             }
         }
-    """
-    try:
-        global embedder
-        
-        data = request.get_json()
-        query = data.get('query')
-        limit = data.get('limit', 10)
-        filters = data.get('filters', {})
-        
-        if not query:
-            return jsonify({"error": "Query required"}), 400
-        
-        # Generate embedding for query
-        if embedder is None:
-            # Lazy load embedder
-            from embeddings import create_embedder
-            embedder = create_embedder(use_onnx=True)
-        
-        import numpy as np
-        query_embedding = embedder.encode(query)
-        
-        # Search vector index
-        vector_results = search_engine.search(
-            query_embedding=query_embedding,
-            k=limit * 2,  # Get more, then filter
-            min_similarity=0.3,
-        )
-        
-        # Get metadata and apply filters
-        results = []
-        for info_hash, similarity in vector_results:
-            shard = metadata_store.get_shard(info_hash)
-            
-            if not shard:
-                continue
-            
-            # Apply filters
-            if filters.get('model') and shard['embedding_model'] != filters['model']:
-                continue
-            
-            if filters.get('tags'):
-                shard_tags = set(shard.get('tags', []))
-                filter_tags = set(filters['tags'])
-                if not shard_tags.intersection(filter_tags):
-                    continue
-            
-            # Build result
-            results.append({
-                "info_hash": info_hash,
-                "display_name": shard['display_name'],
-                "similarity": round(similarity, 4),
-                "model": shard['embedding_model'],
-                "dimension": shard['dimension_size'],
-                "tags": shard.get('tags', []),
-                "seeders": shard.get('seeders', 0),
-                "leechers": shard.get('leechers', 0),
-                "magnet_link": _build_magnet_link(shard),
-            })
-            
-            if len(results) >= limit:
-                break
-        
-        return jsonify({
-            "status": "success",
-            "query": query,
-            "results": results,
-            "count": len(results),
-        })
-    
-    except Exception as e:
-        logger.exception("Search error")
-        return jsonify({"error": str(e)}), 500
+    }), 410  # 410 Gone
 
 
 @app.route('/api/search/embedding', methods=['POST'])
@@ -327,6 +257,59 @@ def search_by_embedding():
     
     except Exception as e:
         logger.exception("Embedding search error")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/peers/<info_hash>', methods=['GET'])
+def get_peers_for_shard(info_hash):
+    """
+    Get list of peers seeding/leeching a shard.
+    
+    Returns peer_id (which can be agent_id) for client-side trust computation.
+    
+    Response:
+    {
+        "info_hash": "abc123",
+        "seeders": [
+            {"agent_id": "agent_xyz", "ip": "1.2.3.4", "port": 6889},
+            ...
+        ],
+        "leechers": [...]
+    }
+    """
+    try:
+        # Get all peers
+        peers = metadata_store.get_peers(info_hash, max_peers=200)
+        
+        # Split into seeders and leechers
+        seeders = [
+            {
+                "agent_id": p.get("peer_id"),  # peer_id = agent_id
+                "ip": p.get("ip"),
+                "port": p.get("port")
+            }
+            for p in peers if p.get("is_seeder")
+        ]
+        
+        leechers = [
+            {
+                "agent_id": p.get("peer_id"),
+                "ip": p.get("ip"),
+                "port": p.get("port")
+            }
+            for p in peers if not p.get("is_seeder")
+        ]
+        
+        return jsonify({
+            "info_hash": info_hash,
+            "seeders": seeders,
+            "leechers": leechers,
+            "seeder_count": len(seeders),
+            "leecher_count": len(leechers)
+        })
+    
+    except Exception as e:
+        logger.exception(f"Get peers error for {info_hash}")
         return jsonify({"error": str(e)}), 500
 
 
