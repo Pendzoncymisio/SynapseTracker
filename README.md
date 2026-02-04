@@ -2,6 +2,21 @@
 
 A custom BitTorrent tracker with vector similarity search for the Synapse Protocol.
 
+## Quick Start
+
+```bash
+# Install dependencies
+uv sync
+
+# Run tracker
+./tracker
+
+# Run with options
+./tracker --port 8080
+./tracker --debug
+./tracker --help
+```
+
 ## Features
 
 - **Standard BitTorrent Protocol**: announce, scrape, peer discovery
@@ -56,17 +71,44 @@ A custom BitTorrent tracker with vector similarity search for the Synapse Protoc
 
 ## Installation
 
+### Using uv (Recommended)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
+
 ```bash
-cd synapse-tracker
+cd SynapseTracker
+
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install dependencies
+uv sync
+
+# Run tracker
+uv run tracker
+
+# Or run directly
+./tracker
+
+# With options
+./tracker --port 8080 --debug
+./tracker --help
+```
+
+### Using pip (Alternative)
+
+```bash
+cd SynapseTracker
+
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Initialize database
-python init_tracker.py
-
 # Run tracker
-python run_tracker.py
+./tracker
 ```
 
 ## Configuration
@@ -211,7 +253,41 @@ The synapse-protocol will automatically use this tracker when configured:
 }
 ```
 
+## Development
+
+### Project Structure
+
+```
+SynapseTracker/
+├── tracker              # Main executable
+├── src/                 # Source code
+│   ├── __init__.py
+│   ├── tracker_server.py
+│   ├── metadata_store.py
+│   └── vector_search.py
+├── config.yaml          # Configuration
+├── pyproject.toml       # Dependencies
+└── README.md
+```
+
+### Code Formatting
+
+```bash
+# Format code with black
+uv run black src/
+```
+
 ## Deployment
+
+### Production with uv
+
+```bash
+# Install production dependencies
+uv sync --no-dev
+
+# Run with gunicorn (production WSGI server)
+uv run gunicorn -w 4 -b 0.0.0.0:6881 'src.tracker_server:app'
+```
 
 ### Docker
 
@@ -231,7 +307,7 @@ After=network.target
 Type=simple
 User=synapse
 WorkingDirectory=/opt/synapse-tracker
-ExecStart=/usr/bin/python3 run_tracker.py
+ExecStart=/opt/synapse-tracker/tracker
 Restart=always
 
 [Install]
@@ -269,6 +345,34 @@ synapse_search_queries_total
 synapse_search_latency_seconds
 synapse_vector_index_size
 ```
+
+## Quick Reference
+
+### Common Commands
+
+```bash
+# Setup
+uv sync                          # Install dependencies
+
+# Development
+./tracker                        # Start server
+./tracker --debug                # Start with debug mode
+./tracker --port 8080            # Custom port
+uv run black src/                # Format code
+
+# Production
+uv sync --no-dev                 # Install only prod dependencies
+uv run gunicorn -w 4 src.tracker_server:app  # Run with gunicorn
+```
+
+### Environment Files
+
+- **tracker** - Main executable (single entry point)
+- **src/** - Source code modules
+- **config.yaml** - Tracker configuration  
+- **pyproject.toml** - Project dependencies (uv)
+- **requirements.txt** - Legacy pip requirements
+- **.python-version** - Python version (3.11)
 
 ## License
 

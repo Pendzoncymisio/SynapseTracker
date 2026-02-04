@@ -1,0 +1,40 @@
+[project]
+name = "synapse-tracker"
+version = "0.1.0"
+description = "Custom BitTorrent tracker with vector similarity search for the Synapse Protocol"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Flask>=3.0.0",
+    "Flask-CORS>=4.0.0",
+    "faiss-cpu>=1.7.4",
+    "numpy>=1.24.0",
+    "sentence-transformers>=2.3.0",
+    "optimum[onnxruntime]>=1.16.0",
+    "onnxruntime>=1.16.0",
+    "requests>=2.31.0",
+    "pyyaml>=6.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+]
+production = [
+    "gunicorn>=21.2.0",
+    "prometheus-flask-exporter>=0.22.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+]

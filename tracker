@@ -1,0 +1,83 @@
+#!/usr/bin/env -S uv run python
+"""Synapse Tracker - Memory Shard P2P Network.
+
+A custom BitTorrent tracker with vector similarity search.
+
+Usage:
+    ./tracker                        # Start development server
+    ./tracker --help                 # Show help
+    ./tracker --port 6881            # Custom port
+    ./tracker --host 0.0.0.0         # Custom host
+"""
+
+import sys
+import logging
+import argparse
+from pathlib import Path
+
+# Add src and Synapse to path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "Synapse"))
+
+from tracker_server import app
+
+
+def main():
+    """Run the Synapse Tracker server."""
+    parser = argparse.ArgumentParser(
+        description="Synapse Tracker - Memory Shard P2P Network"
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=6881,
+        help="Port to listen on (default: 6881)"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode"
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging level (default: INFO)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler("tracker.log"),
+            logging.StreamHandler()
+        ]
+    )
+    
+    # Print banner
+    print("=" * 60)
+    print("Synapse Tracker - Memory Shard P2P Network")
+    print("=" * 60)
+    print()
+    print(f"HTTP API:  http://{args.host}:{args.port}")
+    print(f"Announce:  http://{args.host}:{args.port}/announce")
+    print(f"Scrape:    http://{args.host}:{args.port}/scrape")
+    print(f"Search:    http://{args.host}:{args.port}/api/search")
+    print(f"Stats:     http://{args.host}:{args.port}/api/stats")
+    print()
+    print("=" * 60)
+    
+    # Run server
+    app.run(host=args.host, port=args.port, debug=args.debug)
+
+
+if __name__ == '__main__':
+    main()
