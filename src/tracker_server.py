@@ -533,9 +533,11 @@ def bencode_error(message: str) -> bytes:
 # ============================================================================
 
 if __name__ == '__main__':
+    import os
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     
-    app.run(host='0.0.0.0', port=6881, debug=True)
+    port = int(os.environ.get('PORT', 80))
+    app.run(host='0.0.0.0', port=port, debug=False)

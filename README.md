@@ -123,8 +123,7 @@ Edit `config.yaml`:
 ```yaml
 tracker:
   host: "0.0.0.0"
-  http_port: 6881
-  udp_port: 6969
+  http_port: 80
   
 vector_search:
   index_type: "faiss"
@@ -224,7 +223,7 @@ Response:
 import requests
 
 # Register a new shard
-response = requests.post("http://tracker.example.com:6881/api/register", json={
+response = requests.post("http://tracker.example.com/api/register", json={
     "info_hash": "abcdef1234567890",
     "display_name": "React Hooks Guide",
     "model": "nomic-embed-text-v1.5",
@@ -239,7 +238,7 @@ from embeddings import create_embedder  # From Synapse client
 embedder = create_embedder(use_onnx=True)
 query_embedding = embedder.encode("How to use React hooks").tolist()
 
-response = requests.post("http://tracker.example.com:6881/api/search/embedding", json={
+response = requests.post("http://tracker.example.com/api/search/embedding", json={
     "embedding": query_embedding,
     "limit": 5,
 })
@@ -256,10 +255,9 @@ The synapse-protocol will automatically use this tracker when configured:
 ```json
 {
   "default_trackers": [
-    "http://tracker.example.com:6881/announce",
-    "udp://tracker.example.com:6969/announce"
+    "http://tracker.example.com/announce"
   ],
-  "search_endpoint": "http://tracker.example.com:6881/api/search"
+  "search_endpoint": "http://tracker.example.com/api/search"
 }
 ```
 
@@ -296,14 +294,14 @@ uv run black src/
 uv sync --no-dev
 
 # Run with gunicorn (production WSGI server)
-uv run gunicorn -w 4 -b 0.0.0.0:6881 'src.tracker_server:app'
+uv run gunicorn -w 4 -b 0.0.0.0:80 'src.tracker_server:app'
 ```
 
 ### Docker
 
 ```bash
 docker build -t synapse-tracker .
-docker run -p 6881:6881 -p 6969:6969/udp synapse-tracker
+docker run -p 80:80 synapse-tracker
 ```
 
 ### Systemd Service
