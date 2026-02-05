@@ -154,6 +154,9 @@ def register_shard():
     try:
         data = request.get_json()
         
+        # Log signature status
+        logger.info(f"Register shard: {data.get('info_hash')} - has signature: {bool(data.get('signature'))}, creator: {data.get('creator_agent_id')}")
+        
         # Validate required fields
         required = ["info_hash", "display_name", "embedding_model", "dimension_size"]
         if not all(field in data for field in required):
