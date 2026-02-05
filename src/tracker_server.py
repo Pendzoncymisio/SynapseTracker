@@ -187,6 +187,26 @@ def register_shard():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/api/shard/<info_hash>', methods=['GET'])
+def get_shard(info_hash):
+    """
+    Get shard metadata by info_hash.
+    
+    Returns full shard information including signature and creator fields.
+    """
+    try:
+        shard = metadata_store.get_shard(info_hash)
+        
+        if not shard:
+            return jsonify({"error": "Shard not found"}), 404
+        
+        return jsonify(shard)
+    
+    except Exception as e:
+        logger.exception("Get shard error")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/api/search', methods=['POST'])
 def search_shards():
     """
