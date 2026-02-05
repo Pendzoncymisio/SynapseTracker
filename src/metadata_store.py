@@ -58,7 +58,10 @@ class MetadataStore:
                     seeders INTEGER DEFAULT 0,
                     leechers INTEGER DEFAULT 0,
                     completed INTEGER DEFAULT 0,
-                    metadata TEXT  -- JSON for additional fields
+                    metadata TEXT,  -- JSON for additional fields
+                    creator_agent_id TEXT,  -- Post-quantum identity
+                    creator_public_key TEXT,  -- PQ public key (base64)
+                    signature TEXT  -- PQ signature (base64, ~6KB for ML-DSA-87)
                 )
             """)
             
@@ -185,13 +188,17 @@ class MetadataStore:
                 INSERT INTO shards (
                     info_hash, display_name, embedding_model, dimension_size,
                     entry_count, file_size, tags, description,
-                    created_at, last_seen, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at, last_seen, metadata,
+                    creator_agent_id, creator_public_key, signature
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(info_hash) DO UPDATE SET
                     display_name = excluded.display_name,
                     last_seen = excluded.last_seen,
                     tags = excluded.tags,
-                    metadata = excluded.metadata
+                    metadata = excluded.metadata,
+                    creator_agent_id = excluded.creator_agent_id,
+                    creator_public_key = excluded.creator_public_key,
+                    signature = excluded.signature
             """, (
                 shard_info["info_hash"],
                 shard_info["display_name"],
@@ -204,6 +211,9 @@ class MetadataStore:
                 now,
                 now,
                 metadata_json,
+                shard_info.get("creator_agent_id"),
+                shard_info.get("creator_public_key"),
+                shard_info.get("signature"),
             ))
             
             conn.commit()
